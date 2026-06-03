@@ -850,36 +850,28 @@ const SK='pct_game_v3';const PIN='1234';
 const SHEET_URL='https://script.google.com/macros/s/AKfycbxfnS2A2nYwJgQtT_-DjYW1L3km3qdzef6p9T70DJJL5uJiekB9SYcL18zeCg1TgszSMQ/exec';
 // ส่งข้อมูลเข้า Sheet ด้วย hidden form + iframe — ไม่ติด CORS และไม่ขึ้นกับชนิด response
 function postToSheet(payload,onDone){
-  if(!SHEET_URL){console.warn('[Sheet] ยังไม่ได้ตั้งค่า SHEET_URL');if(onDone)onDone(false);return;}
-  try{
-    var fid='sheetFrame_'+Date.now();
-    var iframe=document.createElement('iframe');
-    iframe.name=fid;iframe.style.display='none';
-    document.body.appendChild(iframe);
-    var form=document.createElement('form');
-    form.method='POST';form.action=SHEET_URL;form.target=fid;form.style.display='none';
-    Object.keys(payload).forEach(function(k){
-      var inp=document.createElement('input');
-      inp.type='hidden';inp.name=k;inp.value=String(payload[k]==null?'':payload[k]);
-      form.appendChild(inp);
-    });
-    document.body.appendChild(form);
-    var finished=false;
-    iframe.onload=function(){
-      if(finished)return;finished=true;
-      console.log('[Sheet] ส่งสำเร็จ ✅',payload.name,payload.type);
-      if(onDone)onDone(true);
-      setTimeout(function(){form.remove();iframe.remove();},500);
-    };
-    form.submit();
-    // ตัดจบถ้า iframe ไม่ยิง onload ใน 8 วินาที
-    setTimeout(function(){
-      if(finished)return;finished=true;
-      console.warn('[Sheet] timeout — ตรวจที่ Sheet โดยตรง');
-      if(onDone)onDone(false);
-      form.remove();iframe.remove();
-    },8000);
-  }catch(e){console.error('[Sheet] error',e);if(onDone)onDone(false);}
+  if(!SHEET_URL){
+    console.warn('[Sheet] ยังไม่ได้ตั้งค่า SHEET_URL');
+    if(onDone) onDone(false);
+    return;
+  }
+
+  fetch(SHEET_URL,{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json'
+    },
+    body:JSON.stringify(payload)
+  })
+  .then(response => response.text())
+  .then(data=>{
+    console.log('[Sheet] ส่งสำเร็จ ✅', data);
+    if(onDone) onDone(true);
+  })
+  .catch(err=>{
+    console.error('[Sheet] error', err);
+    if(onDone) onDone(false);
+  });
 }
 
 // ใช้ชื่อเดิมต่อได้ทุกที่ในเกม
