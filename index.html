@@ -1429,9 +1429,65 @@ function showRes(passed){
 }
 
 // ===== DASHBOARD =====
-function renderDash(){
+async function renderDash(){
   toScreen('dashScreen');
-  const db=loadDB();const sts=db.students||[];
+  let sts=[];
+
+try{
+
+  const res = await fetch(
+    SHEET_URL + '?action=getScores'
+  );
+
+  const rows = await res.json();
+
+  const students={};
+
+  rows.slice(1).forEach(r=>{
+
+    const name=r[2]||'';
+    const cls=r[3]||'';
+    const type=r[5]||'';
+    const score=Number(r[6]||0);
+
+    if(!name)return;
+
+    if(!students[name]){
+      students[name]={
+        name:name,
+        cls:cls,
+        totalScore:0,
+        tests:{}
+      };
+    }
+
+    if(type==='Pre-test'){
+      students[name].tests.pre={score:score};
+    }
+
+    else if(type==='Post-test'){
+      students[name].tests.post={score:score};
+    }
+
+    else{
+      students[name].totalScore += score;
+    }
+
+  });
+
+  sts=Object.values(students);
+
+}catch(err){
+
+  console.error(err);
+
+  document.getElementById('dashBody').innerHTML=
+    '<tr><td colspan="10">เชื่อม Google Sheet ไม่สำเร็จ</td></tr>';
+
+  return;
+}
+
+
   document.getElementById('dashTime').textContent=new Date().toLocaleString('th-TH');
   const tot=sts.length,totSess=sts.reduce((a,s)=>a+(s.sessions||0),0);
   const avg=tot?Math.round(sts.reduce((a,s)=>a+(s.totalScore||0),0)/tot):0;
