@@ -846,8 +846,7 @@ for(let i=0;i<12;i++){
 const SK='pct_game_v3';const PIN='1234';
 
 // ===== เชื่อม Google Sheet (วาง Web app URL ตรงนี้) =====
-// ครูนำลิงก์ที่ได้จาก Apps Script Deploy มาวางแทนข้อความว่างด้านล่าง
-const SHEET_URL='https://script.google.com/macros/s/AKfycbxfnS2A2nYwJgQtT_-DjYW1L3km3qdzef6p9T70DJJL5uJiekB9SYcL18zeCg1TgszSMQ/exec';
+const SHEET_URL='https://script.google.com/macros/s/AKfycbyftLJby5ep72bwhYZ7ZEzn1-gQtgXMeCCN4IyQ2zOukdLUiMv7Tlkb-G1LcESd8mLTQQ/exec';
 // ส่งข้อมูลเข้า Sheet ด้วย hidden form + iframe — ไม่ติด CORS และไม่ขึ้นกับชนิด response
 function postToSheet(payload,onDone){
   if(!SHEET_URL){
