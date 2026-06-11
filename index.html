@@ -127,6 +127,7 @@ tr:nth-child(even){background:#faf7ff}
 <div class="wrap" id="app"></div>
 <div class="toast" id="toast"></div>
 <div class="flash" id="flash"></div>
+<button id="soundToggle" title="เปิด/ปิดเสียง" style="position:fixed;top:12px;right:12px;z-index:600;width:44px;height:44px;border:none;border-radius:50%;background:#fff;box-shadow:0 4px 12px rgba(155,93,229,.25);font-size:1.3rem;cursor:pointer">🔊</button>
 <script>
 /* ============ CONFIG ============ */
 const CONFIG = {
@@ -320,6 +321,81 @@ let S = {
 
 const app = document.getElementById('app');
 const $ = s => document.querySelector(s);
+
+/* ============ SOUND (Web Audio API) ============ */
+const SND = {
+  ctx:null, on:true,
+  init(){
+    if(this.ctx) return;
+    try{ this.ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+  },
+  resume(){ if(this.ctx && this.ctx.state==='suspended') this.ctx.resume(); },
+  // เครื่องมือสร้างโน้ตเดียว
+  tone(freq, start, dur, type='sine', vol=0.25){
+    if(!this.ctx) return;
+    const t0 = this.ctx.currentTime + start;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(vol, t0+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    osc.connect(g).connect(this.ctx.destination);
+    osc.start(t0); osc.stop(t0+dur+0.02);
+  },
+  // โน้ตที่เลื่อนความถี่ (ใช้ทำเสียงตก/ขึ้น)
+  glide(f1, f2, start, dur, type='sine', vol=0.22){
+    if(!this.ctx) return;
+    const t0 = this.ctx.currentTime + start;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(f1, t0);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1,f2), t0+dur);
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(vol, t0+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    osc.connect(g).connect(this.ctx.destination);
+    osc.start(t0); osc.stop(t0+dur+0.02);
+  },
+  play(name){
+    if(!this.on) return;
+    this.init(); this.resume();
+    if(!this.ctx) return;
+    if(name==='correct'){
+      // คริสตัลใสๆ ฟุ้งๆ — โน้ตสูงไล่ขึ้น + หางสะท้อนนิดๆ
+      const notes = [1318.5, 1760, 2093, 2637];
+      notes.forEach((f,i)=> this.tone(f, i*0.045, 0.5, 'sine', 0.18));
+      this.tone(2637, 0.18, 0.7, 'triangle', 0.08); // ประกาย
+    } else if(name==='wrong'){
+      // เอ๊ง-แง้ว ตกลงต่ำ เหงาๆ
+      this.glide(392, 233, 0,    0.22, 'sawtooth', 0.16); // เอ๊ง
+      this.glide(233, 138, 0.20, 0.45, 'sawtooth', 0.18); // แง้ว ลากยาวตกต่ำ
+    } else if(name==='tap'){
+      // ป๊อก สั้นๆ เบาๆ
+      this.tone(660, 0, 0.07, 'sine', 0.14);
+    } else if(name==='win'){
+      // ชนะ — แฟนแฟร์ไล่โน้ตสดใส
+      [523,659,784,1046,1318].forEach((f,i)=> this.tone(f, i*0.11, 0.45, 'triangle', 0.2));
+    } else if(name==='lose'){
+      // แพ้ — ไล่โน้ตลงเศร้าๆ
+      [440,392,330,247].forEach((f,i)=> this.glide(f, f*0.94, i*0.16, 0.4, 'sawtooth', 0.16));
+    } else if(name==='timeout'){
+      // หมดเวลา — เตือนสั้นสองที
+      this.tone(330, 0, 0.12, 'square', 0.14);
+      this.tone(247, 0.14, 0.22, 'square', 0.14);
+    } else if(name==='combo'){
+      // คอมโบ — ประกายขึ้นเร็ว
+      [1046,1318,1568].forEach((f,i)=> this.tone(f, i*0.05, 0.3, 'triangle', 0.16));
+    }
+  }
+};
+// กดอะไรในเกมก็มีเสียงป๊อก (ดักทุกปุ่ม) — ปลดล็อก AudioContext ครั้งแรกที่แตะจอด้วย
+document.addEventListener('pointerdown', (e)=>{
+  SND.init(); SND.resume();
+  const el = e.target.closest('.btn,.opt,.chapter,.stage-btn,.tab');
+  if(el && SND.on) SND.play('tap');
+}, true);
 
 /* ============ HELPERS ============ */
 function toast(msg, ms=2200){
@@ -619,6 +695,7 @@ function timeout(){
   });
   Q.combo = 0;
   if(!Q.set.isTest){ Q.lives--; flash('⏰'); toast('หมดเวลา! ⏰'); }
+  SND.play('timeout');
   setTimeout(nextQ, 1100);
 }
 
@@ -642,10 +719,12 @@ function answer(i){
       Q.score += 10 + timeBonus + comboBonus;
     } else { Q.score += 1; }
     flash(Q.combo>=3?'🔥':'🎉');
+    SND.play(Q.combo>=3?'combo':'correct');
   } else {
     Q.combo = 0;
     if(!Q.set.isTest){ Q.lives--; }
     flash('💔');
+    SND.play('wrong');
   }
   setTimeout(nextQ, 1000);
 }
@@ -676,6 +755,7 @@ async function finishStage(cleared){
     S.stars[key] = Math.max(S.stars[key]||0, star);
   }
   recomputeGameScore(Q.score, key, set.cid);
+  SND.play(cleared?'win':'lose');
 
   // ส่งขึ้น Sheet
   let synced = false;
@@ -868,6 +948,17 @@ function exportCSV(){
 }
 
 /* ============ INIT ============ */
+(function(){
+  const tg = document.getElementById('soundToggle');
+  if(tg){
+    tg.onclick = ()=>{
+      SND.on = !SND.on;
+      tg.textContent = SND.on ? '🔊' : '🔇';
+      if(SND.on){ SND.init(); SND.resume(); SND.play('tap'); }
+      toast(SND.on ? '🔊 เปิดเสียงแล้ว' : '🔇 ปิดเสียงแล้ว');
+    };
+  }
+})();
 screenWelcome();
 
 
